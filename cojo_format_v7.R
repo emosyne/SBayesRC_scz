@@ -47,6 +47,7 @@ colname.N   <- args$samplesize
 colname.chr <- args$chr
 colname.pos <- args$pos
 output      <- args$out
+colname.z   <- args$z
 freq.file   <- args$ref
 
 

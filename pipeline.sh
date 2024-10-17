@@ -12,97 +12,97 @@ cd /Users/eosimo/GoogleDrive/WORK/CF_PhD/SBayesRC_scz
 
 ## this is where you placed file cojo_format_v7.R
 exedir="./"
+input_files="/Users/eosimo/GoogleDrive/WORK/CF_PhD/NF_2HH/private_input_files"
 
 ## this is where you placed LD files and annotation file. They are available for downloading from GCTB website:
 ## https://cnsgenomics.com/software/gctb/#Download
-annot="/Users/eosimo/GoogleDrive/WORK/CF_PhD/NF_2HH/private_input_files/SBayes_annots/annot_baseline2.2.txt" # annottion file
-ldm1=//Users/eosimo/GoogleDrive/WORK/CF_PhD/NF_2HH/private_input_files/LD_ref/ukbEUR_Imputed/
-ldm2=/Users/eosimo/GoogleDrive/WORK/CF_PhD/NF_2HH/private_input_files/LD_ref/ukbEUR_HM3/
+annot="${input_files}/SBayes_annots/annot_baseline2.2.txt" # annotation file
+ldm1=${input_files}/LD_ref/ukbEUR_Imputed/
+ldm2=${input_files}/LD_ref/ukbEUR_HM3/
+
+
+
+
+
+# For a neat organization, you can put your GWAS file into a folder and name it with the trait. All the outputs of following analysis will be put into the same folder. 
+# Several sub-folders will be set for different analysis. 
+
+
+trait=SCZ
+gwas_file=${input_files}/GWAS/PGC3_SCZ_wave3.primary.autosome.public.v3_IMPover8.tsv
 
 ## choose the LD reference based on number of SNPs in GWAS data. 
-if [ $(wc -l  ${trait}/${gwas_file}  | awk '{print $1}'  ) -gt  5149563 ]; then   ldm=$ldm1 ; else  ldm=$ldm2; fi
+if [ $(wc -l  ${gwas_file}  | awk '{print $1}'  ) -gt  5149563 ]; then   ldm=$ldm1 ; else  ldm=$ldm2; fi
 
-
-
-For a neat organization, you can put your GWAS file into a folder and name it with the trait. All the outputs of following analysis will be put into the same folder. 
-Several sub-folders will be set for different analysis. 
-
-
-trait=MDD_01
-gwas_file=PGC_UKB_depression_genome-wide.txt
-ma_file=${trait}/${gwas_file}
-
-mkdir ${trait}/COJO ${trait}/COJO_imp ${trait}/CplusT ${trait}/SBayesR ${trait}/SBayesS  ${trait}/SBayesRC
+mkdir ${trait} ${trait}/COJO ${trait}/COJO_imp ${trait}/CplusT ${trait}/SBayesR ${trait}/SBayesS  ${trait}/SBayesRC
 mkdir ${trait}/SBayesRC/GCTB_v2.5.2 
 
-echo " there are " $(wc -l  ${trait}/${gwas_file} | awk '{print $1}' ) "SNPs in the original GWAS data"
+echo " there are " $(wc -l  ${gwas_file} | awk '{print $1}' ) "SNPs in the original GWAS data"
 
 
 
-# COJO format
-GWAS summary level data has various formats. 
-We will need to format it to cojo format to use it as a proper input for GCTB. 
-for example, if the raw gwas file has a header like this:
+# # COJO format
+# GWAS summary level data has various formats. 
+# We will need to format it to cojo format to use it as a proper input for GCTB. 
+# for example, if the raw gwas file has a header like this:
 
-> MarkerName A1 A2 Freq LogOR StdErrLogOR P
+# > MarkerName A1 A2 Freq LogOR StdErrLogOR P
 
-you can put each element of the header name into the script per flag:
+# you can put each element of the header name into the script per flag:
+head -n 1 ${gwas_file}
 
+snpinfo="/Users/eosimo/GoogleDrive/WORK/CF_PhD/NF_2HH/private_input_files/LD_ref/ukbEUR_HM3/snp.info"
+ma_file=${trait}/GWAS
 
-cmd1="Rscript  ${exedir}/cojo_format_v7.R  \
-  --file  ${trait}/${gwas_file}  \
-  --out  ${trait}/${gwas_file}.ma   \
-  --SNP  MarkerName  \
+Rscript  ${exedir}/cojo_format_v7.R  \
+  --file  ${gwas_file}  \
+  --out  ${ma_file}.cojo \
+  --SNP  SNP  \
   --A1 A1  \
   --A2  A2 \
-  --freq  Freq   \
-  --pvalue P  \
-  --beta  LogOR  \
-  --se  StdErrLogOR   \
-  --samplesize  500199   "
-
-job_name="format_"${trait}
-formatqsub=`qsubshcom  "$cmd1" 1 50G  $job_name  2:00:00  " "     `
+  --freq  freq   \
+  --pvalue p  \
+  --beta  b  \
+  --se  se   \
+  --samplesize  N \
+  --ref ${snpinfo}
 
 
-This R script has several extra functions than formatting:
-> 1. If dbSNP ID is missing, and chr and bp are provided. We will denote the SNP column name as "missing", and match to the dbSNP IDs using the snp.info file in LD reference.
-> 2. If the alleles are in lower case, it converts them to uppercase.
-> 3. Convert odds ratio to effect size if it's named OR.
-> 4. Make a allele frequency comparison plot between data vs LD reference if it is provided
-> 5. If allele frequency is missing, it fills it with the AF in LD reference.
-> 6. If there is not a column of per-SNP-sample-size in raw data, the script can fill it with a unique number found in publication.
-> 7. If the data has two columns for the sample size as Ncase and Ncontrol, the script adds them up to be N. Put them in as "Ncase,Ncontrol" behind --samplesize.
-> 8. Allele frequency is also sometimes separately included for cases and controls. If that’s the case, we will do a calculation with the number of cases and controls.
-> 9. If the data does not have sample size but "NCHROBS", it will be divided by 2 to be sample size.
-> 10. If SE is missing, we will estimate it from BETA and P.
-> 11. If beta is missing but z is provided, we will calculate effect size with z score, allele frequency and sample size. 
 
-This is an exmple of comparison of allele frequency in gwas summary data vs. reference data:
+# # QC and Impute
 
-<img src="GIANT_HEIGHT_YENGO_2022_GWAS_SUMMARY_STATS_EUR_AF_plot.png" width="50%" height="50%" />
+# GCTB does the two things in one step.
+# # GCTB install on my mac: 
+# 0. download gctb source and unpack from https://cnsgenomics.com/software/gctb/#Download
+# 1. Download Eigen and Boost;
+# 2. Download Xcode;
+# 3. Open Terminal and run "xcode-select --install";
+# 4. Install clang-omp using homebrew: "brew install llvm";
+# 4b. Open the gctb Makefile and change the path to eigen and boost (where they have been unpacked, no need to make isntall them), then change the path for CXX = /opt/homebrew/Cellar/llvm/19.1.1/bin/clang++
+# 5. Execute make command.
 
-# QC and Impute
-
-GCTB does the two things in one step.
+for i in {1..591}
+do
+  echo "block: $i"
+  gctb --ldm-eigen $ldm --gwas-summary ${ma_file}.cojo --impute-summary --out ${ma_file}_block --block $i --thread 4
+done
 
 
-job_name="imputation_"${trait}  
-imputesub=`qsubshcom "gctb --ldm-eigen $ldm --gwas-summary ${ma_file}.ma --impute-summary --out ${ma_file}_imp.ma --thread 4"  4 150G $job_name 12:00:00 " -wait=$impqsub  "   `
+# This command will generate a text file ${ma_file}_block for each block. After all blocks are finished, use the following command to merge all .ma files across block into a single file with genome-wide SNPs:
+
+gctb --gwas-summary ${ma_file}_block --merge-block-gwas-summary --out ${ma_file}_allblocks_imp.ma
 
 
 # SBayesRC
 
 
-job_name="sbrc_"${trait}  
-
-sbrc_gctb_sub=`qsubshcom "./gctb_2.5.2_Linux/gctb   \
+gctb   \
 --sbayes RC  \
 --ldm-eigen   ${ldm}   \
---gwas-summary   ${ma_file}_imp.ma.imputed.ma   \
+--gwas-summary   ${ma_file}_imp.cojo   \
 --annot  $annot  \
---out  ${trait}/SBayesRC/GCTB_v2.5.2/${gwas_file}_imp.ma.imputed_sbrc_gctb   \
---thread 10 "  10 150G $job_name 24:00:00 " -wait=$gctbimputesub"   `
+--out  ${trait}/SBayesRC/GCTB_v2.5.2/${ma_file}_imp.cojo_imputed_sbrc_gctb   \
+--thread 4
 
 
 
@@ -111,7 +111,7 @@ sbrc_gctb_sub=`qsubshcom "./gctb_2.5.2_Linux/gctb   \
 At last we compare the marginal effect size with the effect size from SBayesRC with a simple plot. 
 
 
-plotcmd=" Rscript  ${exedir}/effect_size_plot_for_GCTB_output.R    $trait   ${gwas_file}_imp.ma.imputed.ma    ${trait}/SBayesRC/GCTB_v2.5.2/${gwas_file}_imp.ma.imputed_sbrc_gctb   "
+plotcmd=" Rscript  ${exedir}/effect_size_plot_for_GCTB_output.R    $trait   ${gwas_file}_imp.cojo.imputed.cojo    ${trait}/SBayesRC/GCTB_v2.5.2/${gwas_file}_imp.cojo.imputed_sbrc_gctb   "
 jobname="effect_plot_"${trait}
 plotsub=`qsubshcom "$plotcmd"  1  50G  $jobname  1:00:00  " -wait=$sbrc_gctb_sub  " `
 
@@ -146,7 +146,7 @@ snps2exclude=2_duplicated_SNPs_to_exclude.txt
 
 clmp_sub=`qsubshcom "plink --bfile UKB_20k/PLINK/ukbEURu_imp_chr{TASK_ID}_v3_impQC_20k \
   --exclude $snps2exclude \
-  --clump ${trait}/${gwas_file}.ma \
+  --clump ${trait}/${gwas_file}.cojo \
   --clump-p1 0.05  \
   --clump-p2 0.05  \
   --clump-r2 0.1 \
@@ -163,7 +163,7 @@ We can run COJO to see how many significant and independent SNP signal were in t
 cojo_sub=`qsubshcom "gcta-1.94.1  \
 --bfile   UKB_20k/PLINK/ukbEURu_imp_chr{TASK_ID}_v3_impQC_20k \
 --chr   {TASK_ID} \
---cojo-file   ${trait}/${gwas_file}.ma  \
+--cojo-file   ${trait}/${gwas_file}.cojo  \
 --cojo-slct  \
 --out  ${trait}/COJO/${trait}_chr{TASK_ID}_cojo  "  10 150G "COJO"  24:00:00 "  -wait=$formatqsub  -array=1-22 "   `
 
@@ -174,7 +174,7 @@ cojo_sub=`qsubshcom "gcta-1.94.1  \
 {bash, eval =F}
 sbr_gctb_sub=`qsubshcom "gctb  --sbayes R  \
 --ldm-eigen  ${ldm} \
---gwas-summary  ${trait}/${gwas_file}_imp.ma.imputed.ma  \
+--gwas-summary  ${trait}/${gwas_file}_imp.cojo.imputed.cojo  \
 --chain-length 5000 --burn-in 2000   --no-mcmc-bin   \
 --out  ${trait}/SBayesR/${trait}_SBayesR_eigen  --thread 10 "  10 150G  "SBayesR" 24:00:00 " -wait=$gctbimputesub"   `
 
@@ -184,7 +184,7 @@ sbr_gctb_sub=`qsubshcom "gctb  --sbayes R  \
 {bash, eval =F}
 sbs_gctb_sub=`qsubshcom "gctb  --sbayes S  \
 --ldm-eigen  ${ldm} \
---gwas-summary ${trait}/${gwas_file}_imp.ma.imputed.ma  \
+--gwas-summary ${trait}/${gwas_file}_imp.cojo.imputed.cojo  \
 --chain-length 5000 --burn-in 2000 --num-chains 3  --no-mcmc-bin   \
 --out  ${trait}/SBayesS/${trait}_SBayesS_eigen --thread 10 "  10 150G "SBayesS" 24:00:00 " -wait=$gctbimputesub"   `
 
