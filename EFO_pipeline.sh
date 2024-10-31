@@ -1,3 +1,26 @@
+#!/bin/bash 
+
+#SBATCH -J SBayesRC_scz
+#SBATCH -A MURRAY-SL2-CPU
+#SBATCH -p cclake
+#SBATCH --nodes=1
+#! The Cascade Lake (cclake) nodes have 56 CPUs (cores) each and
+#! 3420 MiB of memory per CPU.
+#SBATCH --ntasks=16
+#SBATCH --mem=32G
+#SBATCH --time=1:00:00
+
+#! sbatch directives end here (put any additional directives above this line)
+
+
+
+
+###SCRIPT STARTS FROM HERE
+
+
+module load miniconda/3
+conda activate SBayesRC_scz_env
+
 # This is a pipeline how I format any GWAS summary-level data into cojo format, and use SBayesRC method to generate predictors. The method is implemented in [GCTB](https://cnsgenomics.com/software/gctb/#SBayesRCTutorial). 
 # We also included example code to run SBayesR, SBayesS, COJO and clumping on this page. 
 # They are put in a pipeline with the tool [qsubshcom](https://github.com/zhilizheng/qsubshcom).
@@ -8,11 +31,13 @@
 # Resource data is available for local users with the following path setting, and public for [downloading](https://cnsgenomics.com/software/gctb/#Download) too. 
 
 
-cd /Users/eosimo/GoogleDrive/WORK/CF_PhD/SBayesRC_scz
+# cd /Users/eosimo/GoogleDrive/WORK/CF_PhD/SBayesRC_scz
+cd /home/efo22/SBayesRC_scz
 
 ## this is where you placed file cojo_format_v7.R
 exedir="./"
-input_files="/Users/eosimo/GoogleDrive/WORK/CF_PhD/NF_2HH/private_input_files"
+# input_files="/Users/eosimo/GoogleDrive/WORK/CF_PhD/NF_2HH/private_input_files"
+input_files="/home/efo22/private_input_files"
 
 ## this is where you placed LD files and annotation file. They are available for downloading from GCTB website:
 ## https://cnsgenomics.com/software/gctb/#Download
@@ -35,7 +60,7 @@ gwas_file=${input_files}/GWAS/PGC3_SCZ_wave3.primary.autosome.public.v3_IMPover8
 if [ $(wc -l  ${gwas_file}  | awk '{print $1}'  ) -gt  5149563 ]; then   ldm=$ldm1 ; else  ldm=$ldm2; fi
 
 mkdir ${trait} ${trait}/COJO ${trait}/COJO_imp ${trait}/CplusT ${trait}/SBayesR ${trait}/SBayesS  ${trait}/SBayesRC
-mkdir ${trait}/SBayesRC/GCTB_v2.5.2 
+mkdir ${trait}/SBayesRC/GCTB_v2 
 
 echo " there are " $(wc -l  ${gwas_file} | awk '{print $1}' ) "SNPs in the original GWAS data"
 
@@ -100,7 +125,7 @@ gctb   \
 --ldm-eigen   ${ldm}   \
 --gwas-summary   ${ma_file}_imp.cojo   \
 --annot  $annot  \
---out  ${trait}/SBayesRC/GCTB_v2.5.2/${ma_file}_imp.cojo_imputed_sbrc_gctb   \
+--out  ${trait}/SBayesRC/GCTB_v2/${ma_file}_imp.cojo_imputed_sbrc_gctb   \
 --thread 4
 
 
@@ -110,7 +135,7 @@ gctb   \
 At last we compare the marginal effect size with the effect size from SBayesRC with a simple plot. 
 
 
-plotcmd=" Rscript  ${exedir}/effect_size_plot_for_GCTB_output.R    $trait   ${gwas_file}_imp.cojo.imputed.cojo    ${trait}/SBayesRC/GCTB_v2.5.2/${gwas_file}_imp.cojo.imputed_sbrc_gctb   "
+plotcmd=" Rscript  ${exedir}/effect_size_plot_for_GCTB_output.R    $trait   ${gwas_file}_imp.cojo.imputed.cojo    ${trait}/SBayesRC/GCTB_v2/${gwas_file}_imp.cojo.imputed_sbrc_gctb   "
 jobname="effect_plot_"${trait}
 plotsub=`qsubshcom "$plotcmd"  1  50G  $jobname  1:00:00  " -wait=$sbrc_gctb_sub  " `
 
