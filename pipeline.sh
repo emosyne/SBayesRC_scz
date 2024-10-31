@@ -89,7 +89,6 @@ done
 
 
 # This command will generate a text file ${ma_file}_block for each block. After all blocks are finished, use the following command to merge all .ma files across block into a single file with genome-wide SNPs:
-
 gctb --gwas-summary ${ma_file}_block --merge-block-gwas-summary --out ${ma_file}_allblocks_imp.ma
 
 
