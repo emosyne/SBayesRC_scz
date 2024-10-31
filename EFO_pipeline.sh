@@ -6,9 +6,9 @@
 #SBATCH --nodes=1
 #! The Cascade Lake (cclake) nodes have 56 CPUs (cores) each and
 #! 3420 MiB of memory per CPU.
-#SBATCH --ntasks=16
-#SBATCH --mem=32G
-#SBATCH --time=1:00:00
+#SBATCH --ntasks=56
+#! # SBATCH --mem=32G
+#SBATCH --time=2:00:00
 
 #! sbatch directives end here (put any additional directives above this line)
 
@@ -76,7 +76,7 @@ echo " there are " $(wc -l  ${gwas_file} | awk '{print $1}' ) "SNPs in the origi
 # you can put each element of the header name into the script per flag:
 head -n 1 ${gwas_file}
 
-snpinfo="/Users/eosimo/GoogleDrive/WORK/CF_PhD/NF_2HH/private_input_files/LD_ref/ukbEUR_HM3/snp.info"
+snpinfo="${input_files}/LD_ref/ukbEUR_HM3/snp.info"
 ma_file=${trait}/GWAS
 
 Rscript  ${exedir}/cojo_format_v7.R  \
@@ -96,143 +96,135 @@ Rscript  ${exedir}/cojo_format_v7.R  \
 
 # # QC and Impute
 
-# GCTB does the two things in one step.
-# # GCTB install on my mac: 
-# 0. download gctb source and unpack from https://cnsgenomics.com/software/gctb/#Download
-# 1. Download Eigen and Boost;
-# 2. Download Xcode;
-# 3. Open Terminal and run "xcode-select --install";
-# 4. Install clang-omp using homebrew: "brew install llvm";
-# 4b. Open the gctb Makefile and change the path to eigen and boost (where they have been unpacked, no need to make isntall them), then change the path for CXX = /opt/homebrew/Cellar/llvm/19.1.1/bin/clang++
-# 5. Execute make command.
 
-for i in {1..591}
-do
-  echo "block: $i"
-  gctb --ldm-eigen $ldm --gwas-summary ${ma_file}.cojo --impute-summary --out ${ma_file}_block --block $i --thread 4
-done
+gctb --ldm-eigen $ldm --gwas-summary ${ma_file}.cojo --impute-summary --out ${ma_file}_imp.ma --thread 50
+
+# # impute by block
+# # for i in {1..591}
+# # do
+# #   echo "block: $i"
+# #   gctb --ldm-eigen $ldm --gwas-summary ${ma_file}.cojo --impute-summary --out ${ma_file}_block --block $i --thread 4
+# # done
+# # # This command will generate a text file ${ma_file}_block for each block. After all blocks are finished, use the following command to merge all .ma files across block into a single file with genome-wide SNPs:
+# # gctb --gwas-summary ${ma_file}_block --merge-block-gwas-summary --out ${ma_file}_allblocks_imp.ma
 
 
-# This command will generate a text file ${ma_file}_block for each block. After all blocks are finished, use the following command to merge all .ma files across block into a single file with genome-wide SNPs:
-gctb --gwas-summary ${ma_file}_block --merge-block-gwas-summary --out ${ma_file}_allblocks_imp.ma
+# # SBayesRC
 
 
-# SBayesRC
-
-
-gctb   \
---sbayes RC  \
---ldm-eigen   ${ldm}   \
---gwas-summary   ${ma_file}_imp.cojo   \
---annot  $annot  \
---out  ${trait}/SBayesRC/GCTB_v2/${ma_file}_imp.cojo_imputed_sbrc_gctb   \
---thread 4
+# gctb   \
+# --sbayes RC  \
+# --ldm-eigen   ${ldm}   \
+# --gwas-summary   ${ma_file}_imp.cojo   \
+# --annot  $annot  \
+# --out  ${trait}/SBayesRC/GCTB_v2/${ma_file}_imp.cojo_imputed_sbrc_gctb   \
+# --thread 4
 
 
 
-# plot SBayesRC effect size vs. marginal effect size
+# # plot SBayesRC effect size vs. marginal effect size
 
-At last we compare the marginal effect size with the effect size from SBayesRC with a simple plot. 
-
-
-plotcmd=" Rscript  ${exedir}/effect_size_plot_for_GCTB_output.R    $trait   ${gwas_file}_imp.cojo.imputed.cojo    ${trait}/SBayesRC/GCTB_v2/${gwas_file}_imp.cojo.imputed_sbrc_gctb   "
-jobname="effect_plot_"${trait}
-plotsub=`qsubshcom "$plotcmd"  1  50G  $jobname  1:00:00  " -wait=$sbrc_gctb_sub  " `
+# At last we compare the marginal effect size with the effect size from SBayesRC with a simple plot. 
 
 
-As an example:
-
-<img src="Anorexia_01_pgcAN2.2019-07.modified.vcf.tsv_sbrc.txt_compare_marginal_effect_vs_SBayesRC_20231103_10_18.png" width="50%" height="50%" />
-
-
-# Genetic Variance
+# plotcmd=" Rscript  ${exedir}/effect_size_plot_for_GCTB_output.R    $trait   ${gwas_file}_imp.cojo.imputed.cojo    ${trait}/SBayesRC/GCTB_v2/${gwas_file}_imp.cojo.imputed_sbrc_gctb   "
+# jobname="effect_plot_"${trait}
+# plotsub=`qsubshcom "$plotcmd"  1  50G  $jobname  1:00:00  " -wait=$sbrc_gctb_sub  " `
 
 
-Rscript  quick_Vg_report_from_snpRes_file.R  ${PGS_file}.nopred  ${predictor}.snpRes
+# As an example:
+
+# <img src="Anorexia_01_pgcAN2.2019-07.modified.vcf.tsv_sbrc.txt_compare_marginal_effect_vs_SBayesRC_20231103_10_18.png" width="50%" height="50%" />
 
 
-# profile PGS
+# # Genetic Variance
 
 
-plink \
-   --bfile  $input \
-   --score  $predictor  2 5 8  header sum    \
-   --out ${outdir}/${cohort}_${trait}_SBayesRC
+# Rscript  quick_Vg_report_from_snpRes_file.R  ${PGS_file}.nopred  ${predictor}.snpRes
+
+
+# # profile PGS
+
+
+# plink \
+#    --bfile  $input \
+#    --score  $predictor  2 5 8  header sum    \
+#    --out ${outdir}/${cohort}_${trait}_SBayesRC
 
 
 
-# Clumping
+# # Clumping
 
-Clumping plus threshold method could be used as a baseline model to compare the prediction accuracy.
+# Clumping plus threshold method could be used as a baseline model to compare the prediction accuracy.
 
 
-snps2exclude=2_duplicated_SNPs_to_exclude.txt          
+# snps2exclude=2_duplicated_SNPs_to_exclude.txt          
 
-clmp_sub=`qsubshcom "plink --bfile UKB_20k/PLINK/ukbEURu_imp_chr{TASK_ID}_v3_impQC_20k \
-  --exclude $snps2exclude \
-  --clump ${trait}/${gwas_file}.cojo \
-  --clump-p1 0.05  \
-  --clump-p2 0.05  \
-  --clump-r2 0.1 \
-  --clump-kb 500 \
-  --clump-field "p" \
-  --out ${trait}/CplusT/${gwas_file}_chr{TASK_ID}_clumped   "  10 150G "clumping" 24:00:00 "  -wait=$formatqsub  -array=1-22 "   `
+# clmp_sub=`qsubshcom "plink --bfile UKB_20k/PLINK/ukbEURu_imp_chr{TASK_ID}_v3_impQC_20k \
+#   --exclude $snps2exclude \
+#   --clump ${trait}/${gwas_file}.cojo \
+#   --clump-p1 0.05  \
+#   --clump-p2 0.05  \
+#   --clump-r2 0.1 \
+#   --clump-kb 500 \
+#   --clump-field "p" \
+#   --out ${trait}/CplusT/${gwas_file}_chr{TASK_ID}_clumped   "  10 150G "clumping" 24:00:00 "  -wait=$formatqsub  -array=1-22 "   `
                 
 
 
-# COJO
-We can run COJO to see how many significant and independent SNP signal were in the data. 
+# # COJO
+# We can run COJO to see how many significant and independent SNP signal were in the data. 
 
 
-cojo_sub=`qsubshcom "gcta-1.94.1  \
---bfile   UKB_20k/PLINK/ukbEURu_imp_chr{TASK_ID}_v3_impQC_20k \
---chr   {TASK_ID} \
---cojo-file   ${trait}/${gwas_file}.cojo  \
---cojo-slct  \
---out  ${trait}/COJO/${trait}_chr{TASK_ID}_cojo  "  10 150G "COJO"  24:00:00 "  -wait=$formatqsub  -array=1-22 "   `
+# cojo_sub=`qsubshcom "gcta-1.94.1  \
+# --bfile   UKB_20k/PLINK/ukbEURu_imp_chr{TASK_ID}_v3_impQC_20k \
+# --chr   {TASK_ID} \
+# --cojo-file   ${trait}/${gwas_file}.cojo  \
+# --cojo-slct  \
+# --out  ${trait}/COJO/${trait}_chr{TASK_ID}_cojo  "  10 150G "COJO"  24:00:00 "  -wait=$formatqsub  -array=1-22 "   `
 
 
-# SBayesR
+# # SBayesR
 
 
-{bash, eval =F}
-sbr_gctb_sub=`qsubshcom "gctb  --sbayes R  \
---ldm-eigen  ${ldm} \
---gwas-summary  ${trait}/${gwas_file}_imp.cojo.imputed.cojo  \
---chain-length 5000 --burn-in 2000   --no-mcmc-bin   \
---out  ${trait}/SBayesR/${trait}_SBayesR_eigen  --thread 10 "  10 150G  "SBayesR" 24:00:00 " -wait=$gctbimputesub"   `
+# {bash, eval =F}
+# sbr_gctb_sub=`qsubshcom "gctb  --sbayes R  \
+# --ldm-eigen  ${ldm} \
+# --gwas-summary  ${trait}/${gwas_file}_imp.cojo.imputed.cojo  \
+# --chain-length 5000 --burn-in 2000   --no-mcmc-bin   \
+# --out  ${trait}/SBayesR/${trait}_SBayesR_eigen  --thread 10 "  10 150G  "SBayesR" 24:00:00 " -wait=$gctbimputesub"   `
 
 
-# SBayesS
+# # SBayesS
 
-{bash, eval =F}
-sbs_gctb_sub=`qsubshcom "gctb  --sbayes S  \
---ldm-eigen  ${ldm} \
---gwas-summary ${trait}/${gwas_file}_imp.cojo.imputed.cojo  \
---chain-length 5000 --burn-in 2000 --num-chains 3  --no-mcmc-bin   \
---out  ${trait}/SBayesS/${trait}_SBayesS_eigen --thread 10 "  10 150G "SBayesS" 24:00:00 " -wait=$gctbimputesub"   `
-
-
+# {bash, eval =F}
+# sbs_gctb_sub=`qsubshcom "gctb  --sbayes S  \
+# --ldm-eigen  ${ldm} \
+# --gwas-summary ${trait}/${gwas_file}_imp.cojo.imputed.cojo  \
+# --chain-length 5000 --burn-in 2000 --num-chains 3  --no-mcmc-bin   \
+# --out  ${trait}/SBayesS/${trait}_SBayesS_eigen --thread 10 "  10 150G "SBayesS" 24:00:00 " -wait=$gctbimputesub"   `
 
 
-# Useful links:
 
-GCTB:  
-> https://cnsgenomics.com/software/gctb/#SBayesRCTutorial
 
-R version SBayesRC:  
-The same SBayesRC methods is also available in an R version, which is well explained at Zhili's Github.
-Although the output files appear in different format as the GCTB version, and the content of output are different, the core computation is the same. 
+# # Useful links:
 
-> https://github.com/zhilizheng/SBayesRC  
+# GCTB:  
+# > https://cnsgenomics.com/software/gctb/#SBayesRCTutorial
 
-qsubshcom:  
-> https://github.com/zhilizheng/qsubshcom
+# R version SBayesRC:  
+# The same SBayesRC methods is also available in an R version, which is well explained at Zhili's Github.
+# Although the output files appear in different format as the GCTB version, and the content of output are different, the core computation is the same. 
 
-COJO:
-> https://yanglab.westlake.edu.cn/software/gcta/#COJO
+# > https://github.com/zhilizheng/SBayesRC  
 
-Clump:
-> https://zzz.bwh.harvard.edu/plink/clump.shtml
+# qsubshcom:  
+# > https://github.com/zhilizheng/qsubshcom
+
+# COJO:
+# > https://yanglab.westlake.edu.cn/software/gcta/#COJO
+
+# Clump:
+# > https://zzz.bwh.harvard.edu/plink/clump.shtml
 
 
